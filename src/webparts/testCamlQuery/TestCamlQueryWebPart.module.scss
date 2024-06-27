@@ -19,6 +19,28 @@
   max-width: 420px;
 }
 
+.row {
+  @include ms-Grid-row;
+  //@include ms-fontColor-white;
+  // background-color: $ms-color-themeDark;
+  background-color: white;
+  padding: 20px;
+}
+
+.column {
+  @include ms-Grid-col;
+  @include ms-xl6;
+  @include ms-xlPush3;
+  @include ms-lgPush3;
+  @include ms-lg6;
+  background-color: white;
+  position: initial !important;
+  
+  @media screen and (min-width: 1024px) and (max-width: 1365px) {
+    background-color: lime;
+  }
+}
+
 .links {
   a {
     text-decoration: none;

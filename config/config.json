@@ -11,7 +11,12 @@
       ]
     }
   },
-  "externals": {},
+  "externals": {
+    "bootstrap": {
+      "path": "https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js",
+      "globalName": "bootstrap"
+    }
+  },
   "localizedResources": {
     "TestCamlQueryWebPartStrings": "lib/webparts/testCamlQuery/loc/{locale}.js"
   }
