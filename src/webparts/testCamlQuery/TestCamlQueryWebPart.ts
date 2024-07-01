@@ -9,13 +9,13 @@ import { escape } from '@microsoft/sp-lodash-subset';
 
 import styles from './TestCamlQueryWebPart.module.scss';
 import * as strings from 'TestCamlQueryWebPartStrings';
+import { SPComponentLoader } from '@microsoft/sp-loader';
 import { spfi, SPFx } from "@pnp/sp";
 import { Web } from "@pnp/sp/webs"; 
 //import "@pnp/sp/webs";
 import "@pnp/sp/lists";
 import { LogLevel, PnPLogging } from "@pnp/logging";
-
-//let libraryFlags: boolean[];
+require("bootstrap");
 
 export interface ITestCamlQueryWebPartProps {
   description: string;
@@ -23,7 +23,6 @@ export interface ITestCamlQueryWebPartProps {
   teamTermID : string;
   parentTermID : string;
   libraryName: string[];
-  flags: boolean[];
 }
 
 export default class TestCamlQueryWebPart extends BaseClientSideWebPart<ITestCamlQueryWebPartProps> {
@@ -32,11 +31,6 @@ export default class TestCamlQueryWebPart extends BaseClientSideWebPart<ITestCam
   private _environmentMessage: string = '';
 
   public async render(): Promise<void> {
-    const libraryName : string[] = ["Policies", "Procedures", "Guides", "Forms", "General"];
-    let libraryNameHTML : string = "";
-    let libraryFlagHTML : string = "";
-
-    //libraryFlags=[];
 
     this.domElement.innerHTML = `
     <section class="${styles.testCamlQuery} ${!!this.context.sdks.microsoftTeams ? styles.teams : ''}">
@@ -46,54 +40,50 @@ export default class TestCamlQueryWebPart extends BaseClientSideWebPart<ITestCam
         <div>${this._environmentMessage}</div>
         <div>Web part property value: <strong>${escape(this.properties.description)}</strong></div>
       </div>
-      <div>Flags=${this.properties.flags}</div>
       <div class="${styles.row}">     
-        <div class="${styles.column}" id="libraryName"><h3>Library Names</h3></div>
-        <div class="${styles.column}" id="libraryFlag"><h3>Library Flags</h3></div>
+        <div class="${styles.row}" id="libraryName"></div>
       </div>
-   
     </section>`;
-
-    //console.log("libraryFlag array",libraryFlag);
-    //console.log("libraryName array",this.properties.libraryName);
-    //const libraryTabs : Element | null = this.domElement.querySelector("#librarynames");
-    //console.log(this.properties.libraryFlag);
-
-    //for(let x=0;x<this.properties.libraryFlag.length;x++){
-      //console.log("libraryFlag",x);
-      //libraryTabs!.innerHTML+=`<h4>${this.properties.libraryName[x]}</h4>`;
-    //}
-
-    for (let x = 0; x < libraryName.length; x++) {
-      libraryNameHTML += `<div>${libraryName[x]}</div>`;
-      libraryFlagHTML += `<div>${this.properties.flags[x]}</div>`;
-
-      this.checkData(x,libraryName[x],"IPES Wales","");   
-    }
-
-    console.log("render",this.properties.flags); 
-
-    if(this.domElement.querySelector('#libraryName') !== null){
-      this.domElement.querySelector('#libraryName')!.innerHTML += libraryNameHTML;
-    }  
-
-    if(this.domElement.querySelector('#libraryFlag') !== null) {
-      this.domElement.querySelector('#libraryFlag')!.innerHTML += libraryFlagHTML;
-    }
-    
+    await this._renderListAsync(); //.then( () => {});
+      //this._libraryListeners()
   }
 
-  private checkData(num:number,library:string,team:string,category:string): void { 
-    
+  private async _renderListAsync(): Promise<void> {
+    console.log('renderlistasync');
+    const dcDivisions : string[] = ["asm","cen","cnn","emp","hea"];
+
+    this.properties.libraryName = ["Policies", "Procedures","Guides", "Forms", "General"];
+
+    dcDivisions.forEach(async (site,index)=>{
+      for (let x = 0; x < this.properties.libraryName.length; x++) {
+        this._checkData(x,site,this.properties.libraryName[x],"IPES Wales","")
+          .then(async (response) => {
+            //console.log("renderlistasync",response);
+            if(response.length>0){
+              await this._renderList(this.properties.libraryName[x]).then( ()=> {
+                this._libraryListeners();
+              });
+            }
+          })
+          .catch(() => {});
+      }
+    });    
+    return;
+  }
+
+  private async _checkData(x:number,site:string,library:string,team:string,category:string): Promise<any> {      
+    console.log('checkdata');
+
     const sp = spfi().using(SPFx(this.context)).using(PnPLogging(LogLevel.Warning));  
     const tenant_uri = this.context.pageContext.web.absoluteUrl.split('/',3)[2];
-    const dcDivisions : string[] = ["asm","cen","cnn","emp","hea"];
+    const dcTitle = site+"_dc";
+    const webDC = Web([sp.web,`https://${tenant_uri}/sites/${dcTitle}/`]); 
     let view: string = "";
-    //let count:number=0; 
-
+    
     if (category === "") {
       view =
-        `<View><Query>
+        `<View>
+        <Query>
           <Where>
             <Or>
               <Eq>
@@ -107,10 +97,12 @@ export default class TestCamlQueryWebPart extends BaseClientSideWebPart<ITestCam
             </Or>
           </Where>
         </Query>
+        <RowLimit>10</RowLimit>
         </View>`;
     } else {
       view =
-        `<View><Query>
+        `<View>
+        <Query>
           <Where>
             <Or>
               <Eq>
@@ -124,40 +116,93 @@ export default class TestCamlQueryWebPart extends BaseClientSideWebPart<ITestCam
             </Or>
           </Where>
         </Query>
+        <RowLimit>10</RowLimit>
         </View>`;
     }
 
-    dcDivisions.forEach(async (site,index)=>{
-      const dcTitle = site+"_dc";
-      const webDC = Web([sp.web,`https://${tenant_uri}/sites/${dcTitle}/`]); 
-      await webDC.lists.getByTitle(library)
-        .getItemsByCAMLQuery({ViewXml:view},"FieldValuesAsText/FileRef", "FieldValueAsText/FileLeafRef")
-        .then(async (results) => {
-          console.log("check data",dcTitle," library",library,num,results);
-          if(results.length>0){   
-            console.log("response length",results.length); 
-            this.setFlag(num,true);
-          }else{
-            this.setFlag(num,false);
-          }             
-        })
-    });
-
-    return;
-    //console.log("library",this.properties.libraryName[num],this.properties.libraryFlag[num]);
+    return webDC.lists.getByTitle(library)
+      .getItemsByCAMLQuery({ViewXml:view},"FieldValuesAsText/FileRef", "FieldValueAsText/FileLeafRef")
+      .then(async (response) => {
+        //console.log("checkdata",response);
+        return response;  
+      })
+      .catch(() => {});    
   }
 
-  private setFlag(num:number,flag:boolean): void {
-    console.log("setFlag",num,flag);
-    this.properties.flags[num] = flag;
+  private async _renderList(library:string): Promise<void> {
+    console.log('renderlist');
 
+    //const dataTarget:string=library.toLowerCase();
+    let html: string = '';
+
+    //console.log("renderlist",library);
+    html = `<button class="btn btn-primary text-center mb-1" id="${library}_btn" type="button"><h6 class="libraryText">${library}</h6></button>`;
+
+    if(this.domElement.querySelector('#libraryName') !== null){
+      this.domElement.querySelector('#libraryName')!.innerHTML += html;
+    }
     return;
+  }
+
+  private _libraryListeners() : void {
+    console.log("librarylisteners");
+
+    // Appending the `!` operator here
+    //const container = document.querySelector('#'+libraryBtn)!
+    let timer:any;
+    //const policyElem=document.getElementById("Policies_btn")!
+    const procedureElem=document.getElementById("Procedures_btn")!
+    const guideElem=document.getElementById("Guides_btn")!
+    const formElem=document.getElementById("Forms_btn")!
+    ///const generalElem=document.getElementById("General_btn")!
+
+    // TypeScript will not complain about the container being possibly `null`
+    //container.addEventListener('click', () => alert(`${library} Button clicked`))
+    
+    // *** event listeners for main document libraries
+
+    procedureElem.addEventListener("click", event => { 
+      if(event.detail===1){
+        timer=setTimeout(async () => {
+          alert(`Procedure Button clicked`)
+          //await this.getData("Policies",1,"");
+        },100);
+      }
+    });
+    procedureElem.addEventListener("dblclick",event => {
+      clearTimeout(timer);
+    });
+
+    guideElem.addEventListener("click", event => {
+      if(event.detail===1){
+        timer=setTimeout(async () => {
+          alert(`Guides Button clicked`)
+          //await this.getData("Guides",3,"");
+        },100);
+      }
+    });
+    guideElem.addEventListener("dblclick",event => {
+      clearTimeout(timer);
+    });
+
+    formElem.addEventListener("click", event => { 
+      if(event.detail===1){
+        timer=setTimeout(async () => {
+          alert(`Form Button clicked`)
+          //await this.getData("Policies",1,"");
+        },100);
+      }
+    });
+    formElem.addEventListener("dblclick",event => {
+      clearTimeout(timer);
+    });
+    
   }
 
   public async onInit(): Promise<void> {
     await super.onInit();
-    //SPComponentLoader.loadCss("https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css");
-    //SPComponentLoader.loadCss("https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.3/font/bootstrap-icons.css");
+    SPComponentLoader.loadCss("https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css");
+    SPComponentLoader.loadCss("https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.3/font/bootstrap-icons.css");
 
     return this._getEnvironmentMessage().then(message => {
       //this._environmentMessage = message;
