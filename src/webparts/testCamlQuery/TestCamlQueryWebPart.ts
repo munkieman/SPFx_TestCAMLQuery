@@ -87,12 +87,17 @@ export default class TestCamlQueryWebPart extends BaseClientSideWebPart<ITestCam
 
         // *** check through all division DCs for data
         dcDivisions.forEach(async (site,index)=>{
-          this._getData(flag,site,this.properties.libraryName[x],"IPES Wales",category)
+          await this._getData(flag,site,this.properties.libraryName[x],"WHP Wales",category)
           .then(async (response) => {
             console.log("getDataAsync",response,flag);
             if(response.length>0){
               if(!flag){
-                await this._setLibraryTabs(this.properties.libraryName[x]);        
+                if(category===""){
+                  await this._setLibraryTabs(this.properties.libraryName[x]);
+                }else{
+                  await this._setLibraryTabs(category);
+                  console.log("renderTab",category);
+                }   
               }else{                   
                 await this.addToResults(response).then(async ()=>{            
                   //await this._renderFolders(this.properties.libraryName[x]).then(async () => {
@@ -167,7 +172,7 @@ export default class TestCamlQueryWebPart extends BaseClientSideWebPart<ITestCam
                 </Eq>
                 <Contains>
                   <FieldRef Name="DC_SharedWith"/>
-                  <Value Type="TaxonomyFieldTypeMulti">${category}</Value>
+                  <Value Type="TaxonomyFieldTypeMulti">${team}</Value>
                 </Contains>
               </Or>
             </Where>
@@ -205,7 +210,7 @@ export default class TestCamlQueryWebPart extends BaseClientSideWebPart<ITestCam
 
     //    if(item.DC_Team.TermGuid===this.properties.teamTermID){
           this.properties.dataResults[count]=item;
-    //      count++;
+          count++;
     //    }
       });
     //}
